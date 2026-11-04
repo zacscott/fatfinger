@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Add keyboard slips to a clean draft so it reads like it was typed.
+Make a clean draft read like it was typed: swap out characters you can't type
+(em dashes, arrows, curly quotes, ...), then add keyboard slips.
 
-  fatfinger [clean|mid|sloppy] < draft.txt
+  fatfinger [none|clean|mid|sloppy] < draft.txt
 
 Prints the result, ready to send. Code, links, mentions, refs, numbers,
 paths and identifiers are never touched, and names only ever get a held shift.
+`none` only swaps the characters and adds no slips.
 """
 import hashlib
 import random
@@ -30,51 +32,53 @@ PRESETS = {
         "at_least_one_change": False,  # roll again when nothing changed (text up to HALF_RATE_WORDS only)
         # Everything else.
         "lowercase_sentence_start_pct": 0,
-        "drop_apostrophe_per_contraction_pct": 5,
+        "drop_apostrophe_per_contraction_pct": 10,
         "punctuation_neighbour_per_mark_pct": 0,  # don't -> don;t, fine, but -> fine. but
         "drop_final_full_stop_per_line_pct": 0,
         "space_before_question_mark_per_line_pct": 0,
-        "double_space_per_line_pct": 0.25,
+        "double_space_per_line_pct": 1,
         "missed_space_per_line_pct": 0.5,
         "early_space_per_line_pct": 0.5,  # the problem -> th eproblem
     },
     "mid": {
-        "swapped_letters_per_word_pct": 10,
-        "extra_key_per_word_pct": 1,
-        "wrong_key_per_word_pct": 1,
-        "missed_key_per_word_pct": 2,
-        "doubled_key_per_word_pct": 4,
+        "swapped_letters_per_word_pct": 5,
+        "extra_key_per_word_pct": 3,
+        "wrong_key_per_word_pct": 3,
+        "missed_key_per_word_pct": 3,
+        "doubled_key_per_word_pct": 2,
         "held_shift_per_capital_word_pct": 1,
         "max_typos_per_line": 2,
         "at_least_one_change": True,
         "lowercase_sentence_start_pct": 25,
         "drop_apostrophe_per_contraction_pct": 20,
-        "punctuation_neighbour_per_mark_pct": 5,
+        "punctuation_neighbour_per_mark_pct": 3,
         "drop_final_full_stop_per_line_pct": 20,
-        "space_before_question_mark_per_line_pct": 50,
-        "double_space_per_line_pct": 10,
-        "missed_space_per_line_pct": 40,
-        "early_space_per_line_pct": 40,
+        "space_before_question_mark_per_line_pct": 25,
+        "double_space_per_line_pct": 5,
+        "missed_space_per_line_pct": 5,
+        "early_space_per_line_pct": 5,
     },
     "sloppy": {
         "swapped_letters_per_word_pct": 8,
-        "extra_key_per_word_pct": 2,
-        "wrong_key_per_word_pct": 2,
-        "missed_key_per_word_pct": 5,
-        "doubled_key_per_word_pct": 10,
+        "extra_key_per_word_pct": 8,
+        "wrong_key_per_word_pct": 5,
+        "missed_key_per_word_pct": 8,
+        "doubled_key_per_word_pct": 8,
         "held_shift_per_capital_word_pct": 5,
         "max_typos_per_line": 8,
         "at_least_one_change": True,
         "lowercase_sentence_start_pct": 50,
         "drop_apostrophe_per_contraction_pct": 70,
-        "punctuation_neighbour_per_mark_pct": 30,
-        "drop_final_full_stop_per_line_pct": 60,
-        "space_before_question_mark_per_line_pct": 80,
+        "punctuation_neighbour_per_mark_pct": 25,
+        "drop_final_full_stop_per_line_pct": 70,
+        "space_before_question_mark_per_line_pct": 70,
         "double_space_per_line_pct": 20,
-        "missed_space_per_line_pct": 80,
-        "early_space_per_line_pct": 80,
+        "missed_space_per_line_pct": 20,
+        "early_space_per_line_pct": 20,
     },
 }
+# No slips at all, only the character swaps. For documents people come back to.
+PRESETS["none"] = {key: 0 for key in PRESETS["clean"]}
 
 # Copied through as-is: `code`, URLs, @mentions, #/! refs, anything with a digit, slash,
 # underscore, bracket, = or dot in it, camelCase and ALLCAPS.
@@ -85,6 +89,82 @@ WORD = re.compile(r"(?<![\w'])[A-Za-z]{3,}(?![\w'])")
 ANY_WORD = re.compile(r"[A-Za-z']+")
 CONTRACTION = re.compile(r"\b\w+'(?:t|m|ll|ve|d)\b|\b(?:it|that|what|there)'s\b", re.I)
 ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+
+# Each character that can't be typed on a keyboard, and what a person would type instead.
+TYPED = {
+    # Quotes
+    "‘": "'",
+    "’": "'",
+    "‚": "'",
+    "‛": "'",
+    "′": "'",  # ‘ ’ ‚ ‛ ′
+    "“": '"',
+    "”": '"',
+    "„": '"',
+    "‟": '"',
+    "″": '"',  # “ ” „ ‟ ″
+    "«": '"',
+    "»": '"',  # « »
+    # Dashes and hyphens (em and en dashes between words are handled in DASH below)
+    "‐": "-",
+    "‑": "-",
+    "‒": "-",
+    "−": "-",
+    "⁃": "-",  # ‐ ‑ ‒ − ⁃
+    # Arrows
+    "→": "->",
+    "←": "<-",
+    "↔": "<->",
+    "⇒": "=>",
+    "⇐": "<=",
+    "⇔": "<=>",  # → ← ↔ ⇒ ⇐ ⇔
+    "⟶": "->",
+    "⟵": "<-",
+    "➔": "->",
+    "➜": "->",  # ⟶ ⟵ ➔ ➜
+    # Punctuation and symbols
+    "…": "...",  # …
+    "•": "-",
+    "◦": "-",
+    "‣": "-",
+    "·": "-",  # • ◦ ‣ ·
+    "×": "x",
+    "÷": "/",  # × ÷
+    "≤": "<=",
+    "≥": ">=",
+    "≠": "!=",
+    "≈": "~",
+    "±": "+/-",  # ≤ ≥ ≠ ≈ ±
+    "§": "section ",  # §
+    "™": "",
+    "®": "",
+    "©": "(c)",  # ™ ® ©
+    # Spaces that look like a space but aren't one
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    " ": " ",
+    "　": " ",
+    # Invisible characters (the zero-width joiner stays, emoji need it)
+    "​": "",
+    "‌": "",
+    "⁠": "",
+    "﻿": "",
+    "­": "",
+}
+# An em or en dash (or a horizontal bar). Between numbers it's a range (2-3). Starting a
+# line it's a bullet (- ). Anywhere else it's a break in the sentence, typed as a comma.
+DASH = re.compile(
+    r"(?<=\d)\s*([\u2013\u2014])\s*(?=\d)|^\s*[\u2013\u2014\u2015]+\s*|\s*[\u2013\u2014\u2015]+\s*"
+)
 
 # Every *_pct is scaled by length on a smooth curve: 1 / (1 + (words / HALF_RATE_WORDS) ** FALLOFF).
 # With 150 and 1.5: 20 words 95%, 60 words 80%, 150 words 50%, 300 words 26%,
@@ -196,8 +276,37 @@ def rough(text, p, rng, start, end, left):
     return text
 
 
+def deslop(text):
+    """Swap every character you can't type for what a person would type. Code is left alone."""
+    out, fenced = [], False
+    for line in text.split("\n"):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if fenced or line.lstrip().startswith("```"):
+            out.append(line)
+            continue
+        parts = re.split(r"(`[^`]*`)", line)
+        out.append("".join(s if n % 2 else typed(s) for n, s in enumerate(parts)))
+    return "\n".join(out)
+
+
+def typed(text):
+    """deslop for a stretch with no code in it."""
+
+    def dash(m):
+        if m[1]:
+            return "-"
+        if m.start() == 0:
+            return "- "
+        return "" if m.end() == len(text) or text[m.end()] in ".,;:!?" else ", "
+
+    text = DASH.sub(dash, text)
+    return text.translate(str.maketrans(TYPED))
+
+
 def fatfinger(text, preset="mid"):
-    """Rough up text with a preset. The same draft always gives the same result."""
+    """Deslop text, then rough it up with a preset. The same draft always gives the same result."""
+    text = deslop(text)
     p = dict(PRESETS[preset])
     scale = 1 / (1 + (len(ANY_WORD.findall(text)) / HALF_RATE_WORDS) ** FALLOFF)
     for key in p:
