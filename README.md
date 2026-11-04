@@ -7,13 +7,13 @@ fatfinger takes a clean AI draft and gives it the human touch.
 ## Install
 
 ```bash
-uv tool install --editable git@github.com:zacscott/fatfinger.git
+uv tool install https://github.com/zacscott/fatfinger.git
 ```
 
 OR
 
 ```bash
-uvx --from git@github.com:zacscott/fatfinger.git fatfinger
+uvx --from https://github.com/zacscott/fatfinger.git fatfinger
 ```
 
 ## Use
