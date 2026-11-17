@@ -1,9 +1,49 @@
+import random
 import unittest
 
-from fatfinger.slips import PRESETS, roughen
+from fatfinger.slips import PRESETS, roughen, slip
 
 PROTECTED = ["`foo_bar()`", "https://example.com/x", "@alice", "#1234", "src/app.py", "2pm"]
 DRAFT = "Check `foo_bar()` at https://example.com/x, ping @alice on #1234 and src/app.py before 2pm, I think it works."
+VOWELS = "aeiou"
+
+
+def only_slip(percent_key):
+    """A preset that only rolls one keyboard slip, every time."""
+    p = dict.fromkeys(PRESETS["sloppy"], 0)
+    p[percent_key] = 100
+    return p
+
+
+class SlipTest(unittest.TestCase):
+    def test_no_vowel_is_replaced_by_another_vowel(self):
+        # A vowel for a nearby vowel changes the word rather than the spelling: this -> thus.
+        p = only_slip("wrong_key_per_word_pct")
+        words = ("this", "for", "not", "look", "minute", "because", "should", "about", "other")
+        for word in words:
+            for seed in range(100):
+                out = slip(word, p, random.Random(seed))
+                with self.subTest(word=word, seed=seed, out=out):
+                    self.assertEqual(len(out), len(word))
+                    for was, now in zip(word, out):
+                        self.assertFalse(was != now and was in VOWELS and now in VOWELS)
+
+    def test_no_vowel_is_swapped_with_another_vowel(self):
+        # Swapping two vowels is the same problem (read -> raed), even though it isn't a wrong key.
+        p = only_slip("swapped_letters_per_word_pct")
+        words = ("this", "read", "about", "quiet", "really", "theatre", "outside")
+        for word in words:
+            for seed in range(100):
+                out = slip(word, p, random.Random(seed))
+                with self.subTest(word=word, seed=seed, out=out):
+                    if out != word:
+                        self.assertEqual([c for c in out if c in VOWELS], [c for c in word if c in VOWELS])
+
+    def test_this_never_becomes_thus(self):
+        for n in range(100):
+            result = roughen(f"I think this works, we should ship it. Thanks {n}.", "sloppy")
+            with self.subTest(n=n, result=result):
+                self.assertNotIn("thus", result)
 
 
 class RoughenTest(unittest.TestCase):

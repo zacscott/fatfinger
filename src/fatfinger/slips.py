@@ -12,6 +12,7 @@ PRESETS = {
     "clean": {
         # Keyboard slips, each rolled per word. A word gets at most one, the first
         # word of a line never gets one, and two slipped words are never side by side.
+        # A slip never swaps one vowel for another (this -> thus, for -> fir).
         "swapped_letters_per_word_pct": 0.5,  # the -> hte
         "extra_key_per_word_pct": 0.25,  # obviously -> obviopusly
         "wrong_key_per_word_pct": 0.25,  # change -> chsnge
@@ -79,6 +80,7 @@ WORD = re.compile(r"(?<![\w'])[A-Za-z]{3,}(?![\w'])")
 ANY_WORD = re.compile(r"[A-Za-z']+")
 CONTRACTION = re.compile(r"\b\w+'(?:t|m|ll|ve|d)\b|\b(?:it|that|what|there)'s\b", re.I)
 ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+VOWELS = "aeiou"
 
 # Every *_pct is scaled by length on a smooth curve: 1 / (1 + (words / HALF_RATE_WORDS) ** FALLOFF).
 # With 150 and 1.5: 20 words 95%, 60 words 80%, 150 words 50%, 300 words 26%,
@@ -99,20 +101,34 @@ def near(c):
     return [row[j] for j in (i - 1, i + 1) if i >= 0 and 0 <= j < len(row)]
 
 
+def vowel_for_vowel(a, b):
+    """True when b replaces a and both are vowels, which often reads as another word (this -> thus)."""
+    return a in VOWELS and b in VOWELS
+
+
 def slip(w, p, rng):
-    """At most one slip, each kind rolled on its own chance. Capitalised words only get a held shift."""
+    """At most one slip, each kind rolled on its own chance. Capitalised words only get a held shift.
+
+    No slip ever puts one vowel where another was: a vowel for a nearby vowel is the
+    slip that changes the word rather than the spelling (this -> thus, for -> fir).
+    """
     if w[0].isupper():
         if w[1:].islower() and chance(rng, p["held_shift_per_capital_word_pct"]):
             return w[0] + w[1].upper() + w[2:]
         return w
     i = rng.randrange(1, len(w) - 1)
     keys = near(w[i])
-    if chance(rng, p["swapped_letters_per_word_pct"]) and w[i] != w[i + 1]:
+    if (
+        chance(rng, p["swapped_letters_per_word_pct"])
+        and w[i] != w[i + 1]
+        and not vowel_for_vowel(w[i], w[i + 1])
+    ):
         return w[:i] + w[i + 1] + w[i] + w[i + 2:]
     if keys and chance(rng, p["extra_key_per_word_pct"]):
         return w[: i + 1] + rng.choice(keys) + w[i + 1 :]
-    if keys and chance(rng, p["wrong_key_per_word_pct"]):
-        return w[:i] + rng.choice(keys) + w[i + 1 :]
+    wrong_keys = [k for k in keys if not vowel_for_vowel(w[i], k)]
+    if wrong_keys and chance(rng, p["wrong_key_per_word_pct"]):
+        return w[:i] + rng.choice(wrong_keys) + w[i + 1 :]
     if chance(rng, p["missed_key_per_word_pct"]):
         return w[:i] + w[i + 1 :]
     if chance(rng, p["doubled_key_per_word_pct"]):
