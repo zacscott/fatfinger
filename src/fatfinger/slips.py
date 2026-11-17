@@ -32,10 +32,10 @@ PRESETS = {
         "early_space_per_line_pct": 0.5,  # the problem -> th eproblem
     },
     "mid": {
-        "swapped_letters_per_word_pct": 4,
-        "extra_key_per_word_pct": 2,
-        "wrong_key_per_word_pct": 2,
-        "missed_key_per_word_pct": 2,
+        "swapped_letters_per_word_pct": 3,
+        "extra_key_per_word_pct": 1,
+        "wrong_key_per_word_pct": 1,
+        "missed_key_per_word_pct": 1,
         "doubled_key_per_word_pct": 1,
         "held_shift_per_capital_word_pct": 1,
         "max_typos_per_line": 2,
