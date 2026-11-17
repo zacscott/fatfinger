@@ -36,7 +36,7 @@ PRESETS = {
         "extra_key_per_word_pct": 1,
         "wrong_key_per_word_pct": 1,
         "missed_key_per_word_pct": 1,
-        "doubled_key_per_word_pct": 1,
+        "doubled_key_per_word_pct": 0.5,
         "held_shift_per_capital_word_pct": 1,
         "max_typos_per_line": 2,
         "at_least_one_change": False,
