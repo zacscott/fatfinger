@@ -13,7 +13,7 @@ PRESETS = {
         # Keyboard slips, each rolled per word. A word gets at most one, the first
         # word of a line never gets one, and two slipped words are never side by side.
         # A slip never swaps one vowel for another (this -> thus, for -> fir).
-        "swapped_letters_per_word_pct": 0,  # the -> hte
+        "swapped_letters_per_word_pct": 0.5,  # the -> hte
         "extra_key_per_word_pct": 0,  # obviously -> obviopusly
         "wrong_key_per_word_pct": 0,  # change -> chsnge
         "missed_key_per_word_pct": 0,  # think -> thnk
@@ -26,13 +26,13 @@ PRESETS = {
         "drop_apostrophe_per_contraction_pct": 0,
         "punctuation_neighbour_per_mark_pct": 0,  # don't -> don;t, fine, but -> fine. but
         "drop_final_full_stop_per_line_pct": 0,
-        "space_before_question_mark_per_line_pct": 0,
+        "space_before_question_mark_per_line_pct": 0.5,
         "double_space_per_line_pct": 0,
         "missed_space_per_line_pct": 0,
-        "early_space_per_line_pct": 0,  # the problem -> th eproblem
+        "early_space_per_line_pct": 0.5,  # the problem -> th eproblem
     },
     "mid": {
-        "swapped_letters_per_word_pct": 1.5,
+        "swapped_letters_per_word_pct": 2,
         "extra_key_per_word_pct": 0.5,
         "wrong_key_per_word_pct": 0.5,
         "missed_key_per_word_pct": 0.5,
@@ -47,7 +47,7 @@ PRESETS = {
         "space_before_question_mark_per_line_pct": 10,
         "double_space_per_line_pct": 2.5,
         "missed_space_per_line_pct": 2.5,
-        "early_space_per_line_pct": 2.5,
+        "early_space_per_line_pct": 5,
     },
     "sloppy": {
         "swapped_letters_per_word_pct": 4,
