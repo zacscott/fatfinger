@@ -13,23 +13,23 @@ PRESETS = {
         # Keyboard slips, each rolled per word. A word gets at most one, the first
         # word of a line never gets one, and two slipped words are never side by side.
         # A slip never swaps one vowel for another (this -> thus, for -> fir).
-        "swapped_letters_per_word_pct": 0.5,  # the -> hte
-        "extra_key_per_word_pct": 0.25,  # obviously -> obviopusly
-        "wrong_key_per_word_pct": 0.25,  # change -> chsnge
-        "missed_key_per_word_pct": 0.25,  # think -> thnk
-        "doubled_key_per_word_pct": 0.25,  # really -> reallly, tomorrow -> tomorow
+        "swapped_letters_per_word_pct": 0,  # the -> hte
+        "extra_key_per_word_pct": 0,  # obviously -> obviopusly
+        "wrong_key_per_word_pct": 0,  # change -> chsnge
+        "missed_key_per_word_pct": 0,  # think -> thnk
+        "doubled_key_per_word_pct": 0,  # really -> reallly, tomorrow -> tomorow
         "held_shift_per_capital_word_pct": 0,  # Like -> LIke (the only slip a capitalised word gets)
         "max_typos_per_line": 1,
         "at_least_one_change": False,  # roll again when nothing changed (text up to HALF_RATE_WORDS only)
         # Everything else.
         "lowercase_sentence_start_pct": 0,
-        "drop_apostrophe_per_contraction_pct": 10,
+        "drop_apostrophe_per_contraction_pct": 0,
         "punctuation_neighbour_per_mark_pct": 0,  # don't -> don;t, fine, but -> fine. but
         "drop_final_full_stop_per_line_pct": 0,
         "space_before_question_mark_per_line_pct": 0,
-        "double_space_per_line_pct": 1,
-        "missed_space_per_line_pct": 0.5,
-        "early_space_per_line_pct": 0.5,  # the problem -> th eproblem
+        "double_space_per_line_pct": 0,
+        "missed_space_per_line_pct": 0,
+        "early_space_per_line_pct": 0,  # the problem -> th eproblem
     },
     "mid": {
         "swapped_letters_per_word_pct": 1.5,
