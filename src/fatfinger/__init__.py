@@ -10,12 +10,12 @@ paths and identifiers are protected from keyboard slips, and names only ever get
 """
 
 from fatfinger.sanitise import demeta
-from fatfinger.slips import roughen
+from fatfinger.slips import Preset, roughen
 from fatfinger.typeable import deslop
 
 __all__ = ["fatfinger"]
 
 
-def fatfinger(text, preset="mid"):
+def fatfinger(text: str, preset: Preset = "mid") -> str:
     """Clean pasted text, then rough it up with a preset. The same draft always gives the same result."""
     return roughen(deslop(demeta(text)), preset)

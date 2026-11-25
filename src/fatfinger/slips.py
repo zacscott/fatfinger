@@ -1,14 +1,19 @@
 """Add keyboard slips to typed text, at the rate a preset sets."""
 
+from __future__ import annotations
+
 import hashlib
 import random
 import re
+from typing import Literal
 
 # How sloppy each preset is. Every *_pct is a percentage chance of that thing
 # happening, per word, contraction, mark, sentence or line as the name says.
 # The rates are for a short chat message. Longer text gets proportionally fewer
 # (see HALF_RATE_WORDS), so a letter isn't corrupted and a novel is near spotless.
-PRESETS = {
+Preset = Literal["clean", "mid", "sloppy", "none"]
+
+PRESETS: dict[str, dict[str, float]] = {
     "clean": {
         # Keyboard slips, each rolled per word. A word gets at most one, the first
         # word of a line never gets one, and two slipped words are never side by side.
@@ -73,40 +78,45 @@ PRESETS["none"] = {key: 0 for key in PRESETS["clean"]}
 
 # Copied through as-is: `code`, URLs, @mentions, #/! refs, anything with a digit, slash,
 # underscore, bracket, = or dot in it, camelCase and ALLCAPS.
-PROTECTED = re.compile(
+PROTECTED: re.Pattern[str] = re.compile(
     r"(`[^`]*`|\S+://\S+|[@#!]\w\S*|\S*[\d/\\_()\[\]<>{}=]\S*|\w+\.\w\S*|\b\w*[a-z][A-Z]\w*\b|\b[A-Z]{2,}\w*\b)"
 )
-WORD = re.compile(r"(?<![\w'])[A-Za-z]{3,}(?![\w'])")
-ANY_WORD = re.compile(r"[A-Za-z']+")
-CONTRACTION = re.compile(r"\b\w+'(?:t|m|ll|ve|d)\b|\b(?:it|that|what|there)'s\b", re.I)
-ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
-VOWELS = "aeiou"
+WORD: re.Pattern[str] = re.compile(r"(?<![\w'])[A-Za-z]{3,}(?![\w'])")
+ANY_WORD: re.Pattern[str] = re.compile(r"[A-Za-z']+")
+CONTRACTION: re.Pattern[str] = re.compile(r"\b\w+'(?:t|m|ll|ve|d)\b|\b(?:it|that|what|there)'s\b", re.I)
+ROWS: list[str] = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+VOWELS: str = "aeiou"
 
 # Every *_pct is scaled by length on a smooth curve: 1 / (1 + (words / HALF_RATE_WORDS) ** FALLOFF).
 # With 150 and 1.5: 20 words 95%, 60 words 80%, 150 words 50%, 300 words 26%,
 # 1,000 words 6%, a 100,000-word novel effectively 0.
-HALF_RATE_WORDS = 150
-FALLOFF = 1.5
+HALF_RATE_WORDS: float = 150
+FALLOFF: float = 1.5
 
 
-def chance(rng, percent):
-    """True percent% of the time."""
+def chance(rng: random.Random, percent: float) -> bool:
+    """True when the random roll lands under the percent chance."""
     return rng.random() * 100 < percent
 
 
-def near(c):
+def near(c: str) -> list[str]:
     """The keys either side of c on its QWERTY row."""
     row = next((r for r in ROWS if c.lower() in r), "")
     i = row.find(c.lower())
     return [row[j] for j in (i - 1, i + 1) if i >= 0 and 0 <= j < len(row)]
 
 
-def vowel_for_vowel(a, b):
+def vowel_for_vowel(a: str, b: str) -> bool:
     """True when b replaces a and both are vowels, which often reads as another word (this -> thus)."""
     return a in VOWELS and b in VOWELS
 
 
-def slip(w, p, rng):
+def slip(
+    w: str,
+    p: dict[str, float],
+    *,
+    rng: random.Random,
+) -> str:
     """At most one slip, each kind rolled on its own chance. Capitalised words only get a held shift.
 
     No slip ever puts one vowel where another was: a vowel for a nearby vowel is the
@@ -116,8 +126,10 @@ def slip(w, p, rng):
         if w[1:].islower() and chance(rng, p["held_shift_per_capital_word_pct"]):
             return w[0] + w[1].upper() + w[2:]
         return w
+
     i = rng.randrange(1, len(w) - 1)
     keys = near(w[i])
+
     if (
         chance(rng, p["swapped_letters_per_word_pct"])
         and w[i] != w[i + 1]
@@ -136,10 +148,19 @@ def slip(w, p, rng):
         if double:  # a double letter loses one
             return w[: double.start()] + w[double.start() + 1 :]
         return w[: i + 1] + w[i] + w[i + 1 :]  # a stuck key types one twice
+
     return w
 
 
-def rough(text, p, rng, start, end, left):
+def rough(
+    text: str,
+    p: dict[str, float],
+    *,
+    rng: random.Random,
+    start: bool,
+    end: bool,
+    left: dict[str, float],
+) -> str:
     """Rough up a stretch with nothing protected in it. left holds what the line can still take."""
     pieces, pos = [], 0
     for m in WORD.finditer(text):
@@ -151,7 +172,7 @@ def rough(text, p, rng, start, end, left):
             and left["word"] > 0
             and left["word"] - left["last_slip"] > 1
         ):
-            new = slip(m[0], p, rng)
+            new = slip(m[0], p, rng=rng)
             if new != m[0]:
                 left["slips"] -= 1
                 left["last_slip"] = left["word"]
@@ -161,7 +182,7 @@ def rough(text, p, rng, start, end, left):
     left["word"] += len(ANY_WORD.findall(text[pos:]))
     text = "".join(pieces) + text[pos:]
 
-    def contraction(m):
+    def contraction(m: re.Match[str]) -> str:
         if chance(rng, p["drop_apostrophe_per_contraction_pct"]):
             return m[0].replace("'", "")
         if chance(rng, p["punctuation_neighbour_per_mark_pct"]):
@@ -203,29 +224,39 @@ def rough(text, p, rng, start, end, left):
         and re.search(r"[^.]\.$", text)
     ):
         text = text[:-1]
+
     return text
 
 
-def roughen(text, preset):
+def roughen(text: str, preset: Preset) -> str:
     """Rough up text with a preset, scaled down for longer text. The same text always gives the same result."""
     p = dict(PRESETS[preset])
     scale = 1 / (1 + (len(ANY_WORD.findall(text)) / HALF_RATE_WORDS) ** FALLOFF)
+
     for key in p:
         if key.endswith("_pct"):
             p[key] *= scale
+
     # Long text is allowed to come through untouched.
     must_change = p["at_least_one_change"] and scale >= 0.5
     seed = hashlib.sha256(text.encode()).hexdigest()
     for attempt in range(20):
-        out = rough_lines(text, p, random.Random(f"{seed}{attempt}"))
+        out = rough_lines(text, p, rng=random.Random(f"{seed}{attempt}"))
         if out != text or not must_change:
             break
+
     return out
 
 
-def rough_lines(text, p, rng):
+def rough_lines(
+    text: str,
+    p: dict[str, float],
+    *,
+    rng: random.Random,
+) -> str:
     """One pass over every line, skipping code fences, quotes and indented lines."""
     out, fenced = [], False
+
     for line in text.split("\n"):
         if line.lstrip().startswith("```"):
             fenced = not fenced
@@ -250,6 +281,7 @@ def rough_lines(text, p, rng):
                 rebuilt.append(s)
                 left["word"] += 1
             else:
-                rebuilt.append(rough(s, p, rng, n == 0, n == len(parts) - 1, left))
+                rebuilt.append(rough(s, p, rng=rng, start=n == 0, end=n == len(parts) - 1, left=left))
         out.append("".join(rebuilt))
+
     return "\n".join(out)

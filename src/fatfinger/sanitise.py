@@ -1,9 +1,11 @@
 """Strip terminal escapes, hidden and control characters, odd spaces and lookalike letters from pasted text."""
 
+from __future__ import annotations
+
 import re
 
 # Common Cyrillic and Greek letters that can masquerade as Latin letters.
-CONFUSABLES = str.maketrans({
+CONFUSABLES: dict[str, str] = str.maketrans({
     "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O",
     "Р": "P", "С": "C", "Т": "T", "Х": "X", "а": "a", "е": "e", "о": "o",
     "р": "p", "с": "c", "у": "y", "х": "x", "і": "i", "ј": "j",
@@ -11,21 +13,21 @@ CONFUSABLES = str.maketrans({
     "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
     "α": "a", "ι": "i", "ο": "o", "ρ": "p", "υ": "u", "χ": "x",
 })
-SCRIPT_WORD = re.compile(r"[A-Za-z\u0370-\u03ff\u0400-\u052f]+")
-TERMINAL_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
-HIDDEN = re.compile(r"[\u00ad\u200b-\u200d\u2060\ufeff\ufe00-\ufe0f\U000e0000-\U000e007f]")
-ODD_SPACE = re.compile(r"[\u00a0\u2002-\u200a\u202f\u205f\u3000]")
-CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+SCRIPT_WORD: re.Pattern[str] = re.compile(r"[A-Za-z\u0370-\u03ff\u0400-\u052f]+")
+TERMINAL_ESCAPE: re.Pattern[str] = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
+HIDDEN: re.Pattern[str] = re.compile(r"[\u00ad\u200b-\u200d\u2060\ufeff\ufe00-\ufe0f\U000e0000-\U000e007f]")
+ODD_SPACE: re.Pattern[str] = re.compile(r"[\u00a0\u2002-\u200a\u202f\u205f\u3000]")
+CONTROL: re.Pattern[str] = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 
 
-def demeta(text):
+def demeta(text: str) -> str:
     """Normalize pasted text and remove hidden characters and terminal escapes."""
     text = TERMINAL_ESCAPE.sub("", text)
     text = HIDDEN.sub("", text)
     text = CONTROL.sub("", text)
     text = ODD_SPACE.sub(" ", text)
 
-    def normalize_word(match):
+    def normalize_word(match: re.Match[str]) -> str:
         word = match[0]
         return word.translate(CONFUSABLES) if re.search(r"[A-Za-z]", word) else word
 
